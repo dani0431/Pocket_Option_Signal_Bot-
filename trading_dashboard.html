@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PocketBot v2 — Signal Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Theme variables ────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg:         #080c10;
+  --surface:    #0d1520;
+  --surface2:   #111b2a;
+  --border:     #1a2840;
+  --border2:    #243550;
+  --text:       #c8d8e8;
+  --muted:      #4a6080;
+  --up:         #00e87a;
+  --up-dim:     #00e87a28;
+  --up-mid:     #00e87a60;
+  --down:       #ff3860;
+  --down-dim:   #ff386028;
+  --down-mid:   #ff386060;
+  --wait:       #ffc044;
+  --wait-dim:   #ffc04420;
+  --accent:     #3d8fff;
+  --accent-dim: #3d8fff22;
+  --mono:       'Space Mono', monospace;
+  --head:       'Rajdhani', sans-serif;
+  --shadow:     0 4px 24px rgba(0,0,0,.5);
+  --chart-grid: rgba(61,143,255,.06);
+  --bg-noise:   rgba(61,143,255,.03);
+}
+
+:root[data-theme="light"] {
+  --bg:         #f0f4fa;
+  --surface:    #ffffff;
+  --surface2:   #f7f9fd;
+  --border:     #dde4f0;
+  --border2:    #c8d4e8;
+  --text:       #1a2840;
+  --muted:      #7890b0;
+  --up:         #00b85e;
+  --up-dim:     #00b85e18;
+  --up-mid:     #00b85e55;
+  --down:       #e02050;
+  --down-dim:   #e0205018;
+  --down-mid:   #e0205055;
+  --wait:       #d4860a;
+  --wait-dim:   #d4860a18;
+  --accent:     #1a6fd4;
+  --accent-dim: #1a6fd418;
+  --shadow:     0 4px 24px rgba(30,60,120,.10);
+  --chart-grid: rgba(26,111,212,.07);
+  --bg-noise:   transparent;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background .3s, color .3s;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--bg-noise) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-noise) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+.wrap { position:relative; z-index:1; max-width:1200px; margin:0 auto; padding:24px 20px 60px; }
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border); padding-bottom:16px; margin-bottom:24px;
+}
+.logo { font-family:var(--head); font-size:26px; font-weight:700; letter-spacing:2px; color:var(--text); }
+.logo span { color:var(--accent); }
+.logo sub { font-size:12px; color:var(--muted); letter-spacing:1px; font-weight:400; margin-left:4px; }
+
+.header-right { display:flex; align-items:center; gap:14px; }
+
+.header-status { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); letter-spacing:1px; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--muted); transition:background .4s, box-shadow .4s; }
+.dot.live  { background:var(--up);   box-shadow:0 0 8px var(--up);   animation:pulse 1.5s infinite; }
+.dot.error { background:var(--down); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── Theme toggle ───────────────────────────────────────────── */
+.theme-toggle {
+  width:42px; height:22px; border-radius:11px;
+  background:var(--border2); border:none; cursor:pointer;
+  position:relative; transition:background .3s;
+  flex-shrink:0;
+}
+.theme-toggle::after {
+  content:''; position:absolute; top:3px; left:3px;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--accent); transition:transform .3s;
+}
+[data-theme="light"] .theme-toggle::after { transform:translateX(20px); }
+
+/* ── Sound toggle ───────────────────────────────────────────── */
+.sound-btn {
+  padding:5px 12px; border-radius:5px; font-family:var(--mono); font-size:11px;
+  font-weight:700; cursor:pointer; border:1px solid var(--border2);
+  background:transparent; color:var(--muted); transition:all .2s; letter-spacing:.5px;
+}
+.sound-btn.on { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+
+/* ── Config Panel ───────────────────────────────────────────── */
+.config-panel {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:20px; margin-bottom:20px;
+  display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto auto; gap:12px; align-items:end;
+}
+.field label { display:block; font-size:10px; letter-spacing:1.5px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; }
+.field input, .field select {
+  width:100%; background:var(--bg); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); font-family:var(--mono); font-size:12px;
+  padding:9px 12px; outline:none; transition:border-color .2s;
+}
+.field input:focus, .field select:focus { border-color:var(--accent); }
+.field input::placeholder { color:var(--muted); }
+option { background:#0d1520; }
+
+.btn { padding:9px 20px; border-radius:5px; font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:1px; cursor:pointer; border:none; transition:all .2s; }
+.btn-start { background:var(--accent); color:#fff; }
+.btn-start:hover { filter:brightness(1.2); transform:translateY(-1px); }
+.btn-stop { background:transparent; border:1px solid var(--down); color:var(--down); }
+.btn-stop:hover { background:var(--down-dim); }
+
+/* ── Stats bar ──────────────────────────────────────────────── */
+.stats-bar {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px;
+}
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:14px 16px; display:flex; flex-direction:column; gap:4px;
+  transition:border-color .3s;
+}
+.stat-label { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.stat-value { font-family:var(--head); font-size:24px; font-weight:700; color:var(--text); line-height:1; transition:color .3s; }
+.stat-value.win  { color:var(--up); }
+.stat-value.loss { color:var(--down); }
+.stat-value.info { color:var(--accent); }
+
+/* ── Main grid ──────────────────────────────────────────────── */
+.main-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+/* ── Signal card ────────────────────────────────────────────── */
+.signal-card {
+  grid-column:1/-1; background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:28px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px;
+  transition:border-color .3s, box-shadow .3s; position:relative; overflow:hidden;
+}
+.signal-card::before {
+  content:''; position:absolute; inset:0; opacity:0; transition:opacity .4s; pointer-events:none;
+}
+.signal-card.UP::before   { background:radial-gradient(ellipse at 30% 50%,var(--up-dim) 0%,transparent 65%); opacity:1; }
+.signal-card.DOWN::before { background:radial-gradient(ellipse at 30% 50%,var(--down-dim) 0%,transparent 65%); opacity:1; }
+.signal-card.UP   { border-color:var(--up-mid); }
+.signal-card.DOWN { border-color:var(--down-mid); }
+
+.signal-left { display:flex; align-items:center; gap:24px; }
+.direction-badge {
+  font-family:var(--head); font-size:52px; font-weight:700; letter-spacing:3px;
+  line-height:1; color:var(--muted); transition:color .3s,text-shadow .3s; min-width:170px;
+}
+.direction-badge.UP   { color:var(--up);   text-shadow:0 0 30px var(--up-mid); }
+.direction-badge.DOWN { color:var(--down); text-shadow:0 0 30px var(--down-mid); }
+.arrow-icon { font-size:38px; transition:transform .4s,color .3s; color:var(--muted); }
+.arrow-icon.UP   { color:var(--up);   transform:translateY(-6px); }
+.arrow-icon.DOWN { color:var(--down); transform:translateY(6px); }
+
+.signal-meta { display:flex; flex-direction:column; gap:6px; }
+.signal-meta .label { font-size:10px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+.price-display { font-size:20px; font-family:var(--head); font-weight:600; color:var(--text); letter-spacing:1px; }
+.asset-display { font-size:13px; color:var(--accent); letter-spacing:2px; }
+.cooldown-display { font-size:11px; color:var(--wait); letter-spacing:1px; }
+
+.confidence-block { flex:1; max-width:260px; }
+.conf-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+.conf-label { font-size:10px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+.conf-value { font-family:var(--head); font-size:28px; font-weight:700; color:var(--muted); transition:color .3s; }
+.conf-value.UP   { color:var(--up); }
+.conf-value.DOWN { color:var(--down); }
+.conf-bar { width:100%; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.conf-fill { height:100%; width:0%; border-radius:4px; background:var(--muted); transition:width .6s cubic-bezier(.4,0,.2,1), background .3s; }
+.conf-fill.UP   { background:linear-gradient(90deg,var(--up-mid),var(--up)); }
+.conf-fill.DOWN { background:linear-gradient(90deg,var(--down-mid),var(--down)); }
+
+/* ── Candlestick chart ──────────────────────────────────────── */
+.chart-card {
+  grid-column:1/-1; background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:20px; display:flex; flex-direction:column; gap:12px;
+}
+.chart-header { display:flex; align-items:center; justify-content:space-between; }
+.card-title { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+canvas#priceChart { width:100% !important; }
+
+/* ── Timer card ─────────────────────────────────────────────── */
+.timer-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:22px; display:flex; flex-direction:column; gap:14px;
+}
+.timer-display {
+  font-family:var(--head); font-size:54px; font-weight:700; color:var(--text);
+  letter-spacing:4px; line-height:1; text-align:center; font-variant-numeric:tabular-nums;
+}
+.timer-display.warn { color:var(--wait); text-shadow:0 0 20px var(--wait); }
+.timer-controls { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+.timer-btn {
+  padding:6px 14px; border-radius:4px; font-family:var(--mono); font-size:11px; font-weight:700;
+  cursor:pointer; border:1px solid var(--border2); background:transparent; color:var(--text);
+  transition:all .2s; letter-spacing:.5px;
+}
+.timer-btn:hover  { border-color:var(--accent); color:var(--accent); }
+.timer-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.timer-start-btn {
+  width:100%; padding:10px; border-radius:5px; font-family:var(--mono); font-size:12px;
+  font-weight:700; letter-spacing:1px; cursor:pointer;
+  border:1px solid var(--accent); background:var(--accent-dim); color:var(--accent); transition:all .2s;
+}
+.timer-start-btn:hover   { background:var(--accent); color:#fff; }
+.timer-start-btn.running { border-color:var(--wait); background:var(--wait-dim); color:var(--wait); }
+
+/* ── Indicators card ────────────────────────────────────────── */
+.indicators-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:22px; display:flex; flex-direction:column; gap:12px;
+}
+.indicator-row {
+  display:flex; justify-content:space-between; align-items:center;
+  border-bottom:1px solid var(--border); padding-bottom:9px;
+}
+.indicator-row:last-child { border-bottom:none; padding-bottom:0; }
+.ind-name  { color:var(--muted); font-size:11px; letter-spacing:1px; }
+.ind-value { font-family:var(--head); font-size:15px; font-weight:600; }
+.ind-value.bull { color:var(--up); }
+.ind-value.bear { color:var(--down); }
+.ind-value.neut { color:var(--wait); }
+.ind-badge {
+  font-size:9px; letter-spacing:.5px; padding:2px 6px; border-radius:3px;
+  margin-left:6px; font-weight:700;
+}
+.ind-badge.new  { background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent); }
+
+/* ── Reasons ────────────────────────────────────────────────── */
+.reasons-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px; grid-column:1/-1; }
+.reasons-title { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+.reasons-list { display:flex; flex-wrap:wrap; gap:8px; }
+.reason-tag {
+  background:var(--border); border-radius:4px; padding:5px 12px; font-size:11px;
+  color:var(--text); letter-spacing:.5px; border-left:3px solid var(--muted); transition:border-color .3s;
+}
+.reason-tag.UP   { border-color:var(--up); }
+.reason-tag.DOWN { border-color:var(--down); }
+
+/* ── Scanner card ───────────────────────────────────────────── */
+.scanner-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px; grid-column:1/-1; }
+.scanner-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.scanner-title { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+.scanner-btn {
+  padding:5px 14px; border-radius:4px; font-family:var(--mono); font-size:11px; font-weight:700;
+  cursor:pointer; border:1px solid var(--accent); background:var(--accent-dim); color:var(--accent); transition:all .2s;
+}
+.scanner-btn:hover  { background:var(--accent); color:#fff; }
+.scanner-btn:disabled { opacity:.4; cursor:not-allowed; }
+.scanner-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:8px; }
+.scanner-item {
+  background:var(--surface2); border:1px solid var(--border); border-radius:6px;
+  padding:10px 12px; display:flex; flex-direction:column; gap:4px; transition:border-color .2s;
+}
+.scanner-item.UP   { border-color:var(--up-mid); }
+.scanner-item.DOWN { border-color:var(--down-mid); }
+.sc-name  { font-size:10px; color:var(--muted); letter-spacing:1px; }
+.sc-dir   { font-family:var(--head); font-size:18px; font-weight:700; color:var(--muted); }
+.sc-dir.UP   { color:var(--up); }
+.sc-dir.DOWN { color:var(--down); }
+.sc-conf  { font-size:10px; color:var(--muted); }
+.sc-scanning { font-size:11px; color:var(--muted); text-align:center; padding:12px; grid-column:1/-1; }
+
+/* ── History table ──────────────────────────────────────────── */
+.history-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px; grid-column:1/-1; }
+.history-title { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+.history-table { width:100%; border-collapse:collapse; }
+.history-table th { text-align:left; font-size:10px; color:var(--muted); letter-spacing:1px; padding:0 10px 10px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+.history-table td { padding:9px 10px; font-size:12px; border-bottom:1px solid var(--border); color:var(--text); }
+.history-table tr:last-child td { border-bottom:none; }
+.history-table tr:hover td { background:var(--border); }
+.badge { display:inline-block; padding:3px 10px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:1px; }
+.badge.UP   { background:var(--up-dim);   color:var(--up);   border:1px solid var(--up-mid); }
+.badge.DOWN { background:var(--down-dim); color:var(--down); border:1px solid var(--down-mid); }
+.badge.WIN  { background:var(--up-dim);   color:var(--up);   border:1px solid var(--up-mid); }
+.badge.LOSS { background:var(--down-dim); color:var(--down); border:1px solid var(--down-mid); }
+.empty-row td { text-align:center; color:var(--muted); padding:28px; }
+.outcome-btn {
+  padding:3px 8px; border-radius:3px; font-family:var(--mono); font-size:10px;
+  cursor:pointer; border:1px solid var(--border2); background:transparent; color:var(--muted);
+  transition:all .15s; margin:0 2px;
+}
+.outcome-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* ── Toast ──────────────────────────────────────────────────── */
+#toast {
+  position:fixed; bottom:28px; right:28px; background:var(--surface);
+  border:1px solid var(--border2); border-radius:6px; padding:12px 20px;
+  font-size:12px; color:var(--text); opacity:0; transform:translateY(10px);
+  transition:all .3s; z-index:99; max-width:320px;
+}
+#toast.show { opacity:1; transform:translateY(0); }
+#toast.err  { border-color:var(--down); color:var(--down); }
+#toast.ok   { border-color:var(--up);   color:var(--up); }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width:820px) {
+  .config-panel { grid-template-columns:1fr 1fr; }
+  .main-grid    { grid-template-columns:1fr; }
+  .signal-card  { flex-direction:column; align-items:flex-start; }
+  .direction-badge { font-size:42px; }
+  .timer-display   { font-size:46px; }
+  .stats-bar       { grid-template-columns:repeat(3,1fr); }
+}
+@media (max-width:520px) {
+  .stats-bar { grid-template-columns:1fr 1fr; }
+  .scanner-grid { grid-template-columns:repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">POCKET<span>BOT</span><sub>v2.0</sub></div>
+    <div class="header-right">
+      <button class="sound-btn" id="soundBtn" onclick="toggleSound()">🔇 SOUND OFF</button>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"></button>
+      <div class="header-status">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">OFFLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Config -->
+  <div class="config-panel">
+    <div class="field">
+      <label>API URL (ngrok)</label>
+      <input type="text" id="apiUrl" placeholder="https://xxxx.ngrok-free.app" value="">
+    </div>
+    <div class="field">
+      <label>Asset</label>
+      <select id="assetSel">
+        <option value="EURUSD_otc">EUR/USD OTC</option>
+        <option value="GBPUSD_otc">GBP/USD OTC</option>
+        <option value="USDJPY_otc">USD/JPY OTC</option>
+        <option value="AUDUSD_otc">AUD/USD OTC</option>
+        <option value="USDCAD_otc">USD/CAD OTC</option>
+        <option value="EURGBP_otc">EUR/GBP OTC</option>
+        <option value="USDCHF_otc">USD/CHF OTC</option>
+        <option value="EURJPY_otc">EUR/JPY OTC</option>
+        <option value="GBPJPY_otc">GBP/JPY OTC</option>
+        <option value="NZDUSD_otc">NZD/USD OTC</option>
+        <option value="XAUUSD_otc">Gold OTC</option>
+        <option value="XAGUSD_otc">Silver OTC</option>
+        <option value="BTCUSD_otc">BTC/USD OTC</option>
+        <option value="ETHUSD_otc">ETH/USD OTC</option>
+        <option value="LTCUSD_otc">LTC/USD OTC</option>
+        <option value="XRPUSD_otc">XRP/USD OTC</option>
+        <option value="#AAPL_otc">AAPL OTC</option>
+        <option value="#TSLA_otc">TSLA OTC</option>
+        <option value="#AMZN_otc">AMZN OTC</option>
+        <option value="#GOOGL_otc">GOOGL OTC</option>
+        <option value="#MSFT_otc">MSFT OTC</option>
+        <option value="#META_otc">META OTC</option>
+        <option value="#NVDA_otc">NVDA OTC</option>
+        <option value="#NFLX_otc">NFLX OTC</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Timeframe</label>
+      <select id="tfSel">
+        <option value="5s">5 sec</option>
+        <option value="10s">10 sec</option>
+        <option value="30s">30 sec</option>
+        <option value="1m" selected>1 min</option>
+        <option value="2m">2 min</option>
+        <option value="5m">5 min</option>
+        <option value="15m">15 min</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>SSID</label>
+      <input type="password" id="ssidInput" placeholder="Paste SSID here">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-start" onclick="startBot()">▶ START</button>
+      <button class="btn btn-stop"  onclick="stopBot()">■ STOP</button>
+    </div>
+  </div>
+
+  <!-- Stats bar (win rate) -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Total Signals</div>
+      <div class="stat-value info" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Decided</div>
+      <div class="stat-value" id="statDecided">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Wins</div>
+      <div class="stat-value win" id="statWins">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Losses</div>
+      <div class="stat-value loss" id="statLosses">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Win Rate</div>
+      <div class="stat-value win" id="statWinRate">—</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+
+    <!-- Signal card -->
+    <div class="signal-card WAIT" id="signalCard">
+      <div class="signal-left">
+        <div>
+          <div class="arrow-icon" id="arrowIcon">—</div>
+          <div class="direction-badge" id="directionBadge">WAIT</div>
+        </div>
+        <div class="signal-meta">
+          <div class="label">Asset</div>
+          <div class="asset-display" id="assetDisplay">—</div>
+          <div class="label" style="margin-top:8px">Price</div>
+          <div class="price-display" id="priceDisplay">—</div>
+          <div class="cooldown-display" id="cooldownDisplay"></div>
+        </div>
+      </div>
+      <div class="confidence-block">
+        <div class="conf-header">
+          <span class="conf-label">Confidence</span>
+          <span class="conf-value" id="confValue">0%</span>
+        </div>
+        <div class="conf-bar"><div class="conf-fill" id="confFill"></div></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;letter-spacing:.5px;">
+          Threshold: <span id="thresholdDisplay">70%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Candlestick Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="card-title">Price Chart — Last 40 Candles</div>
+        <div style="font-size:10px;color:var(--muted)" id="chartAssetLabel">—</div>
+      </div>
+      <canvas id="priceChart" height="160"></canvas>
+    </div>
+
+    <!-- Timer -->
+    <div class="timer-card">
+      <div class="card-title">Trade Timer</div>
+      <div class="timer-display" id="timerDisplay">00:60</div>
+      <div class="timer-controls">
+        <button class="timer-btn active" onclick="setTimer(30)"  data-sec="30">30s</button>
+        <button class="timer-btn"        onclick="setTimer(60)"  data-sec="60">1m</button>
+        <button class="timer-btn"        onclick="setTimer(120)" data-sec="120">2m</button>
+        <button class="timer-btn"        onclick="setTimer(300)" data-sec="300">5m</button>
+      </div>
+      <button class="timer-start-btn" id="timerStartBtn" onclick="toggleTimer()">START TIMER</button>
+    </div>
+
+    <!-- Indicators -->
+    <div class="indicators-card">
+      <div class="card-title">Indicators</div>
+      <div class="indicator-row">
+        <span class="ind-name">RSI (14)</span>
+        <span class="ind-value neut" id="indRsi">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">EMA 5</span>
+        <span class="ind-value neut" id="indEma5">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">EMA 13</span>
+        <span class="ind-value neut" id="indEma13">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">MACD</span>
+        <span class="ind-value neut" id="indMacd">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">Stochastic K</span>
+        <span class="ind-value neut" id="indStoch">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">BB %B</span>
+        <span class="ind-value neut" id="indBb">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">
+          ATR %
+          <span class="ind-badge new">NEW</span>
+        </span>
+        <span class="ind-value neut" id="indAtr">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">
+          Volume Ratio
+          <span class="ind-badge new">NEW</span>
+        </span>
+        <span class="ind-value neut" id="indVol">—</span>
+      </div>
+      <div class="indicator-row">
+        <span class="ind-name">Candles</span>
+        <span class="ind-value neut" id="indCandles">—</span>
+      </div>
+    </div>
+
+    <!-- Reasons -->
+    <div class="reasons-card">
+      <div class="reasons-title">Signal Reasons</div>
+      <div class="reasons-list" id="reasonsList">
+        <div class="reason-tag">Waiting for data...</div>
+      </div>
+    </div>
+
+    <!-- Multi-asset Scanner -->
+    <div class="scanner-card">
+      <div class="scanner-header">
+        <div class="scanner-title">Multi-Asset Scanner</div>
+        <button class="scanner-btn" id="scanBtn" onclick="runScanner()">⟳ SCAN ALL</button>
+      </div>
+      <div class="scanner-grid" id="scannerGrid">
+        <div class="sc-scanning">Press SCAN ALL to scan all assets</div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="history-card">
+      <div class="history-title">Signal History — Mark outcomes to track win rate</div>
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Time (UTC)</th>
+            <th>Asset</th>
+            <th>Direction</th>
+            <th>Confidence</th>
+            <th>Price</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr class="empty-row"><td colspan="6">No signals yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /main-grid -->
+</div><!-- /wrap -->
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════════════
+let apiBase       = '';
+let pollInterval  = null;
+let timerSec      = 30;
+let timerLeft     = 0;
+let timerRunning  = false;
+let timerInterval = null;
+let soundEnabled  = false;
+let lastDirection = 'WAIT';
+let candleBuffer  = [];       // rolling price history for chart
+let audioCtx      = null;
+
+// Auto-detect localhost or use current origin
+(function autoDetectApiBase() {
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  const port = window.location.port || (protocol === 'https:' ? 443 : 80);
+  apiBase = `${protocol}//${hostname}:${port}`;
+})();
+
+// ══════════════════════════════════════════════════════════════
+// Helpers
+// ══════════════════════════════════════════════════════════════
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show' + (type ? ' ' + type : '');
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => t.className = '', 3200);
+}
+
+function fmt(n, dec = 5) {
+  return typeof n === 'number' ? n.toFixed(dec) : (n ?? '—');
+}
+
+function setStatus(live, text) {
+  document.getElementById('statusDot').className  = 'dot' + (live ? ' live' : live === null ? ' error' : '');
+  document.getElementById('statusText').textContent = text.toUpperCase();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Theme toggle
+// ══════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('pbTheme', next);
+  redrawChart();
+}
+(function initTheme() {
+  const saved = localStorage.getItem('pbTheme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
+// ══════════════════════════════════════════════════════════════
+// Sound alerts
+// ══════════════════════════════════════════════════════════════
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = soundEnabled ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+  btn.classList.toggle('on', soundEnabled);
+  if (soundEnabled && !audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  toast(soundEnabled ? 'Sound alerts ON' : 'Sound alerts OFF');
+}
+
+function playSignalBeep(direction) {
+  if (!soundEnabled || !audioCtx) return;
+  try {
+    // UP = two ascending tones; DOWN = two descending tones
+    const freqs = direction === 'UP' ? [440, 660] : [660, 440];
+    freqs.forEach((freq, i) => {
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type      = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.18 + 0.3);
+      osc.start(audioCtx.currentTime + i * 0.18);
+      osc.stop(audioCtx.currentTime + i * 0.18 + 0.3);
+    });
+  } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// Timer
+// ══════════════════════════════════════════════════════════════
+function setTimer(sec) {
+  timerSec = sec;
+  if (!timerRunning) { timerLeft = sec; renderTimer(); }
+  document.querySelectorAll('.timer-btn').forEach(b => {
+    b.classList.toggle('active', +b.dataset.sec === sec);
+  });
+}
+
+function renderTimer() {
+  const m  = Math.floor(timerLeft / 60);
+  const s  = timerLeft % 60;
+  const el = document.getElementById('timerDisplay');
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.classList.toggle('warn', timerLeft <= 10 && timerRunning);
+}
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval); timerRunning = false; timerLeft = timerSec; renderTimer();
+    document.getElementById('timerStartBtn').textContent = 'START TIMER';
+    document.getElementById('timerStartBtn').classList.remove('running');
+  } else {
+    timerLeft = timerSec; timerRunning = true;
+    document.getElementById('timerStartBtn').textContent = '■ STOP TIMER';
+    document.getElementById('timerStartBtn').classList.add('running');
+    timerInterval = setInterval(() => {
+      timerLeft--;
+      renderTimer();
+      if (timerLeft <= 0) {
+        clearInterval(timerInterval); timerRunning = false;
+        document.getElementById('timerStartBtn').textContent = 'START TIMER';
+        document.getElementById('timerStartBtn').classList.remove('running');
+        toast('⏱ Timer finished!');
+        playBeepTimer();
+      }
+    }, 1000);
+  }
+}
+
+function playBeepTimer() {
+  if (!soundEnabled || !audioCtx) return;
+  try {
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.type = 'square'; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+  } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// Candlestick chart
+// ══════════════════════════════════════════════════════════════
+const canvas = document.getElementById('priceChart');
+const ctx2d  = canvas.getContext('2d');
+
+function addCandleToBuffer(price) {
+  // Build pseudo-candles from price stream for display
+  if (!candleBuffer.length || candleBuffer[candleBuffer.length-1].count >= 10) {
+    candleBuffer.push({ open: price, high: price, low: price, close: price, count: 1 });
+    if (candleBuffer.length > 40) candleBuffer.shift();
+  } else {
+    const c = candleBuffer[candleBuffer.length-1];
+    c.close = price;
+    c.high  = Math.max(c.high, price);
+    c.low   = Math.min(c.low, price);
+    c.count++;
+  }
+}
+
+function redrawChart() {
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.parentElement.clientWidth - 40;
+  const H   = 160;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx2d.scale(dpr, dpr);
+  ctx2d.clearRect(0, 0, W, H);
+
+  if (candleBuffer.length < 2) {
+    ctx2d.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+    ctx2d.font = '11px Space Mono, monospace';
+    ctx2d.textAlign = 'center';
+    ctx2d.fillText('Waiting for price data…', W / 2, H / 2);
+    return;
+  }
+
+  const theme  = document.documentElement.getAttribute('data-theme');
+  const upCol  = theme === 'light' ? '#00b85e' : '#00e87a';
+  const dnCol  = theme === 'light' ? '#e02050' : '#ff3860';
+  const gridC  = theme === 'light' ? 'rgba(26,111,212,.1)' : 'rgba(61,143,255,.07)';
+  const textC  = theme === 'light' ? '#7890b0' : '#4a6080';
+
+  const allHigh  = Math.max(...candleBuffer.map(c => c.high));
+  const allLow   = Math.min(...candleBuffer.map(c => c.low));
+  const range    = allHigh - allLow || allHigh * 0.001;
+  const pad      = { t: 10, b: 20, l: 8, r: 8 };
+  const plotH    = H - pad.t - pad.b;
+  const plotW    = W - pad.l - pad.r;
+  const candleW  = Math.max(3, Math.floor(plotW / candleBuffer.length) - 2);
+
+  const scaleY = v => pad.t + plotH * (1 - (v - allLow) / range);
+
+  // Grid lines
+  ctx2d.strokeStyle = gridC;
+  ctx2d.lineWidth   = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (plotH / 4) * i;
+    ctx2d.beginPath(); ctx2d.moveTo(pad.l, y); ctx2d.lineTo(W - pad.r, y); ctx2d.stroke();
+    const val = allHigh - (range / 4) * i;
+    ctx2d.fillStyle  = textC;
+    ctx2d.font       = '9px Space Mono, monospace';
+    ctx2d.textAlign  = 'right';
+    ctx2d.fillText(val.toFixed(val > 100 ? 2 : 5), W - pad.r - 2, y - 2);
+  }
+
+  // Candles
+  candleBuffer.forEach((c, i) => {
+    const x    = pad.l + i * (plotW / candleBuffer.length) + (plotW / candleBuffer.length - candleW) / 2;
+    const isUp = c.close >= c.open;
+    const col  = isUp ? upCol : dnCol;
+    const top  = scaleY(Math.max(c.open, c.close));
+    const bot  = scaleY(Math.min(c.open, c.close));
+    const body = Math.max(1, bot - top);
+
+    // Wick
+    ctx2d.strokeStyle = col; ctx2d.lineWidth = 1;
+    ctx2d.beginPath();
+    ctx2d.moveTo(x + candleW / 2, scaleY(c.high));
+    ctx2d.lineTo(x + candleW / 2, scaleY(c.low));
+    ctx2d.stroke();
+
+    // Body
+    ctx2d.fillStyle = col;
+    ctx2d.fillRect(x, top, candleW, body);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Render signal
+// ══════════════════════════════════════════════════════════════
+function renderSignal(sig) {
+  const dir  = sig.direction || 'WAIT';
+  const conf = sig.confidence || 0;
+
+  // Sound alert on new signal
+  if (dir !== 'WAIT' && dir !== lastDirection) {
+    playSignalBeep(dir);
+  }
+  lastDirection = dir;
+
+  // Card
+  document.getElementById('signalCard').className = `signal-card ${dir}`;
+
+  // Badge + arrow
+  const badge = document.getElementById('directionBadge');
+  badge.textContent = dir; badge.className = `direction-badge ${dir}`;
+  const arrow = document.getElementById('arrowIcon');
+  arrow.textContent = dir === 'UP' ? '▲' : dir === 'DOWN' ? '▼' : '—';
+  arrow.className   = `arrow-icon ${dir}`;
+
+  // Confidence
+  document.getElementById('confValue').textContent = `${conf}%`;
+  document.getElementById('confValue').className   = `conf-value ${dir}`;
+  document.getElementById('confFill').style.width  = `${conf}%`;
+  document.getElementById('confFill').className    = `conf-fill ${dir}`;
+
+  // Price / asset
+  const price = sig.price;
+  document.getElementById('priceDisplay').textContent = price ? price.toFixed(price > 100 ? 2 : 5) : '—';
+  document.getElementById('assetDisplay').textContent = (sig.asset || '—').replace('_otc',' OTC').replace('#','');
+  document.getElementById('chartAssetLabel').textContent = (sig.asset || '—').replace('_otc',' OTC').replace('#','');
+
+  // Cooldown
+  const cd = sig.cooldown_remaining || 0;
+  document.getElementById('cooldownDisplay').textContent = cd > 0 ? `⏳ Cooldown: ${cd}s` : '';
+
+  // Update chart buffer
+  if (price) { addCandleToBuffer(price); redrawChart(); }
+
+  // Indicators
+  const ind = sig.indicators || {};
+  const rsi = ind.rsi;
+  document.getElementById('indRsi').textContent = fmt(rsi, 2);
+  document.getElementById('indRsi').className   = `ind-value ${rsi < 30 ? 'bull' : rsi > 70 ? 'bear' : 'neut'}`;
+
+  const ema5 = ind.ema5, ema13 = ind.ema13;
+  document.getElementById('indEma5').textContent  = fmt(ema5);
+  document.getElementById('indEma13').textContent = fmt(ema13);
+  const emaCls = ema5 > ema13 ? 'bull' : 'bear';
+  document.getElementById('indEma5').className    = `ind-value ${emaCls}`;
+  document.getElementById('indEma13').className   = `ind-value ${emaCls}`;
+
+  const macd = ind.macd, msig = ind.macd_sig;
+  document.getElementById('indMacd').textContent = fmt(macd, 6);
+  document.getElementById('indMacd').className   = `ind-value ${macd > msig ? 'bull' : 'bear'}`;
+
+  const sk = ind.stoch_k;
+  document.getElementById('indStoch').textContent = fmt(sk, 2);
+  document.getElementById('indStoch').className   = `ind-value ${sk < 20 ? 'bull' : sk > 80 ? 'bear' : 'neut'}`;
+
+  const bb = ind.bb_pct;
+  document.getElementById('indBb').textContent = bb !== undefined ? `${(bb*100).toFixed(1)}%` : '—';
+  document.getElementById('indBb').className   = `ind-value ${bb < 0.2 ? 'bull' : bb > 0.8 ? 'bear' : 'neut'}`;
+
+  // ATR (new)
+  const atrPct = ind.atr_pct;
+  document.getElementById('indAtr').textContent = atrPct !== undefined ? `${(atrPct).toFixed(4)}%` : '—';
+  document.getElementById('indAtr').className   = `ind-value ${atrPct >= 0.05 ? 'bull' : atrPct >= 0.02 ? 'neut' : 'bear'}`;
+
+  // Volume (new)
+  const volR  = ind.vol_ratio;
+  const surge = ind.vol_surge;
+  document.getElementById('indVol').textContent = volR !== undefined ? `${volR.toFixed(2)}x${surge ? ' 🔥' : ''}` : 'N/A';
+  document.getElementById('indVol').className   = `ind-value ${volR >= 1.5 ? 'bull' : volR < 0.7 ? 'bear' : 'neut'}`;
+
+  document.getElementById('indCandles').textContent = sig.candle_count ?? '—';
+
+  // Reasons
+  const reasons = sig.reasons || [];
+  const rl = document.getElementById('reasonsList');
+  rl.innerHTML = reasons.length
+    ? reasons.map(r => `<div class="reason-tag ${dir}">${r}</div>`).join('')
+    : '<div class="reason-tag">Waiting for data...</div>';
+}
+
+function renderStats(stats) {
+  if (!stats) return;
+  document.getElementById('statTotal').textContent   = stats.total   ?? 0;
+  document.getElementById('statDecided').textContent = stats.decided ?? 0;
+  document.getElementById('statWins').textContent    = stats.wins    ?? 0;
+  document.getElementById('statLosses').textContent  = stats.losses  ?? 0;
+  document.getElementById('statWinRate').textContent = stats.win_rate !== null && stats.win_rate !== undefined
+    ? `${stats.win_rate}%` : '—';
+}
+
+function renderHistory(items) {
+  const tbody = document.getElementById('historyBody');
+  if (!items || !items.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No signals yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(h => {
+    const t      = h.time ? new Date(h.time).toLocaleTimeString() : '—';
+    const asset  = (h.asset||'—').replace('_otc',' OTC').replace('#','');
+    const result = h.result
+      ? `<span class="badge ${h.result}">${h.result}</span>`
+      : `<button class="outcome-btn" onclick="recordOutcome(${h.id},'WIN')">W</button>
+         <button class="outcome-btn" onclick="recordOutcome(${h.id},'LOSS')">L</button>`;
+    return `<tr>
+      <td>${t}</td>
+      <td>${asset}</td>
+      <td><span class="badge ${h.direction}">${h.direction}</span></td>
+      <td>${h.confidence}%</td>
+      <td>${h.price ? (+h.price).toFixed(5) : '—'}</td>
+      <td>${result}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Multi-asset scanner
+// ══════════════════════════════════════════════════════════════
+const SCAN_ASSETS = [
+  'EURUSD_otc','GBPUSD_otc','USDJPY_otc','AUDUSD_otc','USDCAD_otc',
+  'EURGBP_otc','USDCHF_otc','XAUUSD_otc','BTCUSD_otc','ETHUSD_otc',
+  '#AAPL_otc','#TSLA_otc','#MSFT_otc','#NVDA_otc',
+];
+
+async function runScanner() {
+  if (!apiBase) { toast('Start the bot first', 'err'); return; }
+  const btn  = document.getElementById('scanBtn');
+  const grid = document.getElementById('scannerGrid');
+  btn.disabled = true; btn.textContent = '⟳ Scanning…';
+  grid.innerHTML = `<div class="sc-scanning">Scanning ${SCAN_ASSETS.length} assets…</div>`;
+
+  const results = [];
+
+  for (const asset of SCAN_ASSETS) {
+    try {
+      // Temporarily switch asset and poll signal
+      await fetch(`${apiBase}/change`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ asset, timeframe: document.getElementById('tfSel').value })
+      });
+      await new Promise(r => setTimeout(r, 800));
+      const res = await fetch(`${apiBase}/signal`);
+      const sig = await res.json();
+      results.push({ asset, direction: sig.direction, confidence: sig.confidence });
+    } catch (_) {
+      results.push({ asset, direction: 'ERR', confidence: 0 });
+    }
+  }
+
+  // Restore original asset
+  const origAsset = document.getElementById('assetSel').value;
+  await fetch(`${apiBase}/change`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ asset: origAsset, timeframe: document.getElementById('tfSel').value })
+  }).catch(() => {});
+
+  // Render results — sorted: UP/DOWN first, then WAIT
+  results.sort((a, b) => {
+    const rank = d => d === 'UP' || d === 'DOWN' ? 0 : 1;
+    return rank(a.direction) - rank(b.direction) || b.confidence - a.confidence;
+  });
+
+  grid.innerHTML = results.map(r => {
+    const label = r.asset.replace('_otc',' OTC').replace('#','');
+    const arrow = r.direction === 'UP' ? '▲' : r.direction === 'DOWN' ? '▼' : '—';
+    return `<div class="scanner-item ${r.direction}">
+      <div class="sc-name">${label}</div>
+      <div class="sc-dir ${r.direction}">${arrow} ${r.direction}</div>
+      <div class="sc-conf">${r.direction !== 'WAIT' && r.direction !== 'ERR' ? r.confidence + '%' : ''}</div>
+    </div>`;
+  }).join('');
+
+  btn.disabled = false; btn.textContent = '⟳ SCAN ALL';
+
+  const actionable = results.filter(r => r.direction !== 'WAIT' && r.direction !== 'ERR').length;
+  toast(`Scan complete — ${actionable} actionable signals`, 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Outcome recording
+// ══════════════════════════════════════════════════════════════
+async function recordOutcome(signalId, result) {
+  if (!apiBase) return;
+  try {
+    await fetch(`${apiBase}/outcome`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ signal_id: signalId, result })
+    });
+    toast(`Signal #${signalId} → ${result}`, result === 'WIN' ? 'ok' : 'err');
+    pollNow();
+  } catch (_) { toast('Failed to record outcome', 'err'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// API polling
+// ══════════════════════════════════════════════════════════════
+async function pollNow() {
+  if (!apiBase) return;
+  try {
+    const [sigRes, histRes, statRes] = await Promise.all([
+      fetch(`${apiBase}/signal`),
+      fetch(`${apiBase}/history`),
+      fetch(`${apiBase}/status`),
+    ]);
+    if (!sigRes.ok) throw new Error('Signal fetch failed');
+
+    const sig  = await sigRes.json();
+    const hist = await histRes.json().catch(() => ({}));
+    const stat = await statRes.json().catch(() => ({}));
+
+    renderSignal(sig);
+    renderHistory((hist.signals || []));
+    renderStats(hist.stats);
+    setStatus(stat.connected, stat.status || 'Live');
+  } catch (e) {
+    setStatus(null, 'Connection error');
+  }
+}
+
+async function startBot() {
+  const url  = document.getElementById('apiUrl').value.trim().replace(/\/$/, '') || apiBase;
+  const ssid = document.getElementById('ssidInput').value.trim();
+  const asset= document.getElementById('assetSel').value;
+  const tf   = document.getElementById('tfSel').value;
+  if (!ssid) { toast('Enter your SSID', 'err'); return; }
+
+  apiBase = url;
+  document.getElementById('apiUrl').value = url;
+  setStatus(false, 'Connecting…');
+  try {
+    const res  = await fetch(`${url}/start`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ssid, asset, timeframe: tf, demo: true }),
+    });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'err'); return; }
+    toast(`Bot started → ${asset} @ ${tf}`, 'ok');
+    setStatus(false, 'Starting…');
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(pollNow, 2000);
+    pollNow();
+  } catch (e) {
+    toast('Cannot reach API — check URL', 'err');
+    setStatus(null, 'Unreachable');
+  }
+}
+
+async function stopBot() {
+  if (!apiBase) return;
+  try { await fetch(`${apiBase}/stop`, { method: 'POST' }); toast('Bot stopped'); } catch (_) {}
+  clearInterval(pollInterval);
+  setStatus(false, 'Offline');
+  renderSignal({ direction:'WAIT', confidence:0, indicators:{}, reasons:[] });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════
+setTimer(30);
+renderTimer();
+redrawChart();
+window.addEventListener('resize', redrawChart);
+
+// Auto-populate API URL field with detected localhost
+document.getElementById('apiUrl').value = apiBase;
+document.getElementById('apiUrl').readOnly = true;
+document.getElementById('apiUrl').style.opacity = '0.7';
+</script>
+</body>
+</html>
